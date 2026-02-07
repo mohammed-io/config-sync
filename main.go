@@ -46,12 +46,16 @@ var untrackCmd = &cobra.Command{
 
 var pullCmd = &cobra.Command{
 	Use:   "pull",
-	Short: "Git pull in synced-files folder",
+	Short: "Git pull and restore files to their locations",
 	Run: func(cmd *cobra.Command, args []string) {
 		git := NewGitRunner()
 		if err := git.Pull(); err != nil {
 			log.Fatalf("Pull failed: %v", err)
 		}
+		if err := appConfig.RestoreFiles(); err != nil {
+			log.Fatalf("Restore failed: %v", err)
+		}
+		log.Println("Pull and restore completed successfully")
 	},
 }
 

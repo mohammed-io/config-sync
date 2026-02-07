@@ -245,3 +245,59 @@ func (c *JsonConfig) cleanSyncedFolder(path string) error {
 
 	return nil
 }
+
+// RestoreFiles copies tracked files from synced-files back to their original locations
+func (c *JsonConfig) RestoreFiles() error {
+	if err := c.checkInitialized(); err != nil {
+		return err
+	}
+
+	syncDir := c.folder.Suffix("synced-files")
+
+	for tildePath := range c.Files {
+		destPath := ShorthandPath{}.New(tildePath)
+		hash := md5Hash(tildePath)
+		srcDir := filepath.Join(syncDir.FullPath, hash)
+
+		// Check if source exists
+		srcInfo, err := os.Stat(srcDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				log.Printf("Skipping %s: not found in synced-files\n", tildePath)
+				continue
+			}
+			return fmt.Errorf("failed to stat sync dir for %s: %w", tildePath, err)
+		}
+
+		// Create parent directory if needed
+		if err := os.MkdirAll(filepath.Dir(destPath.FullPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent dir for %s: %w", tildePath, err)
+		}
+
+		if srcInfo.IsDir() {
+			// For directories, copy the entire directory
+			srcPath := filepath.Join(srcDir, filepath.Base(destPath.FullPath))
+			if _, err := os.Stat(srcPath); err != nil {
+				log.Printf("Skipping %s: source not found\n", tildePath)
+				continue
+			}
+			if err := copyDir(srcPath, destPath.FullPath); err != nil {
+				return fmt.Errorf("failed to restore directory %s: %w", tildePath, err)
+			}
+			log.Printf("Restored directory: %s\n", tildePath)
+		} else {
+			// For files, copy the file
+			srcFile := filepath.Join(srcDir, filepath.Base(destPath.FullPath))
+			if _, err := os.Stat(srcFile); err != nil {
+				log.Printf("Skipping %s: source not found\n", tildePath)
+				continue
+			}
+			if err := copyFile(srcFile, destPath.FullPath); err != nil {
+				return fmt.Errorf("failed to restore %s: %w", tildePath, err)
+			}
+			log.Printf("Restored file: %s\n", tildePath)
+		}
+	}
+
+	return nil
+}
