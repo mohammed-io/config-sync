@@ -1,3 +1,18 @@
+## [v0.0.13] - 2026-02-07
+
+[Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.12...v0.0.13)
+
+### Changed
+- Add limitations ([a436bed](https://github.com/mohammed-io/config-sync/commit/a436bedcc44ce7ac22c96ba10da8967d56bc34f2))
+
+<details>
+<summary>Other</summary>
+
+- Improve readme ([670f8ca](https://github.com/mohammed-io/config-sync/commit/670f8ca4fef0cf016acaf5ac3b4c7c0beaa7221a))
+
+</details>
+
+
 ## [v0.0.12] - 2026-02-07
 
 [Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.11...v0.0.12)
