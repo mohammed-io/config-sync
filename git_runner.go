@@ -36,12 +36,12 @@ func (g RealGitRunner) run(args ...string) error {
 
 func (g RealGitRunner) Pull() error {
 	log.Printf("Pulling from %s\n", configFolder().TildePath)
-	return g.run("pull main main")
+	return g.run("pull", "--no-rebase", "origin", "main")
 }
 
 func (g RealGitRunner) Push() error {
 	log.Printf("Pushing to %s\n", configFolder().TildePath)
-	return g.run("push")
+	return g.run("push", "-u", "origin", "main")
 }
 
 func (g RealGitRunner) SetOrigin(url string, force bool) error {
