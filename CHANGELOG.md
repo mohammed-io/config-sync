@@ -1,3 +1,8 @@
+## [v0.0.12] - 2026-02-07
+
+[Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.11...v0.0.12)
+
+
 ## [v0.0.11] - 2026-02-07
 
 [Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.10...v0.0.11)

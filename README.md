@@ -11,7 +11,7 @@ Do you have multiple machines and felt the fatigue of syncing your config across
 - Passwords or credentials
 - Private SSH keys
 - Sensitive personal data
-- Anything you wouldn't want public
+- Anything you wouldn't want to be public or shared by others
 
 **If your config files contain secrets, DO NOT use a public GitHub repository.**
 
@@ -29,7 +29,7 @@ This software is provided "as is", without warranty of any kind. The authors and
 ## Installation
 
 ```bash
-go install github.com/mohammed-io/config-sync@v0.0.11
+go install github.com/mohammed-io/config-sync@v0.0.12
 ```
 
 Or build from source:
