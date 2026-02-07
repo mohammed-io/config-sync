@@ -10,6 +10,34 @@ import (
 	"strings"
 )
 
+// isMergeConflict checks if there are merge conflict markers in the directory
+func isMergeConflict(dir string) bool {
+	// Check for common conflict markers in files
+	conflictMarkers := []string{"<<<<<<<", ">>>>>>>", "======="}
+
+	for _, marker := range conflictMarkers {
+		// Use git grep to find conflict markers
+		cmd := exec.Command("git", "grep", "-q", marker, "--", ".")
+		cmd.Dir = dir
+		// Don't output anything
+		if cmd.Run() == nil {
+			return true
+		}
+	}
+
+	// Also check for unmerged files in git status
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	// Look for UU (both modified) or other conflict indicators
+	status := string(output)
+	return strings.Contains(status, "UU") || strings.Contains(status, "AA") || strings.Contains(status, "DD")
+}
+
 // GitRunner defines git operations
 type GitRunner interface {
 	Pull() error
@@ -36,12 +64,34 @@ func (g RealGitRunner) run(args ...string) error {
 
 func (g RealGitRunner) Pull() error {
 	log.Printf("Pulling from %s\n", configFolder().TildePath)
-	return g.run("pull", "--no-rebase", "origin", "main")
+	err := g.run("pull", "--no-rebase", "origin", "main")
+	if err != nil && isMergeConflict(g.dir) {
+		return fmt.Errorf("merge conflict detected in %s\n\n"+
+			"Please resolve the conflicts manually:\n"+
+			"  1. cd %s\n"+
+			"  2. Edit conflicted files and remove conflict markers\n"+
+			"  3. git add <resolved files>\n"+
+			"  4. git commit\n"+
+			"  5. Run 'config-sync pull' again to restore files",
+			configFolder().TildePath, configFolder().TildePath)
+	}
+	return err
 }
 
 func (g RealGitRunner) Push() error {
 	log.Printf("Pushing to %s\n", configFolder().TildePath)
-	return g.run("push", "-u", "origin", "main")
+	err := g.run("push", "-u", "origin", "main")
+	if err != nil && isMergeConflict(g.dir) {
+		return fmt.Errorf("merge conflict detected in %s\n\n"+
+			"Please resolve the conflicts manually:\n"+
+			"  1. cd %s\n"+
+			"  2. Edit conflicted files and remove conflict markers\n"+
+			"  3. git add <resolved files>\n"+
+			"  4. git commit\n"+
+			"  5. Run 'config-sync push' again",
+			configFolder().TildePath, configFolder().TildePath)
+	}
+	return err
 }
 
 func (g RealGitRunner) SetOrigin(url string, force bool) error {
