@@ -15,7 +15,7 @@ Do you have multiple machines and felt the fatigue of syncing your config across
 
 **If your config files contain secrets, DO NOT use a public GitHub repository.**
 
-Use a **private** repository or consider using secret management tools (like `envchain`, `1password`, `vault`, etc.) for sensitive data.
+Use a **private** repository OR consider using secret management tools (like `envchain`, `1password`, `vault`, etc.) for sensitive data.
 
 ### No Liability
 
