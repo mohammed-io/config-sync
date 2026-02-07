@@ -54,8 +54,8 @@ CHANGED=()
 OTHER=()
 
 while IFS= read -r commit; do
-  # Parse conventional commit format: type(scope): description
-  if [[ "$commit" =~ ^([a-z]+)(\(.+\))?:?\s+(.+)$ ]]; then
+  # Try conventional commit format first: type: description or type(scope): description
+  if [[ "$commit" =~ ^([a-z]+)(\(.+\)):\s+(.+)$ ]]; then
     TYPE="${BASH_REMATCH[1]}"
     MESSAGE="${BASH_REMATCH[3]}"
 
@@ -74,10 +74,13 @@ while IFS= read -r commit; do
         ;;
     esac
   else
-    # Non-conventional commit, skip or add to other
+    # Non-conventional commit - add as-is to Other
     OTHER+=("$commit")
   fi
 done < <(git log "${COMMIT_RANGE}" --pretty=format:"%s" --reverse)
+
+# Track all commits for the "All Changes" section
+ALL_COMMITS=()
 
 # Build changelog entries
 CHANGELOG_ENTRIES=()
@@ -86,6 +89,7 @@ if [[ ${#ADDED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Added")
   for entry in "${ADDED[@]}"; do
     CHANGELOG_ENTRIES+=("- $entry")
+    ALL_COMMITS+=("✨ $entry")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -94,6 +98,7 @@ if [[ ${#FIXED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Fixed")
   for entry in "${FIXED[@]}"; do
     CHANGELOG_ENTRIES+=("- $entry")
+    ALL_COMMITS+=("🐛 $entry")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -102,6 +107,7 @@ if [[ ${#CHANGED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Changed")
   for entry in "${CHANGED[@]}"; do
     CHANGELOG_ENTRIES+=("- $entry")
+    ALL_COMMITS+=("♻️ $entry")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -110,7 +116,21 @@ if [[ ${#OTHER[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Other")
   for entry in "${OTHER[@]}"; do
     CHANGELOG_ENTRIES+=("- $entry")
+    ALL_COMMITS+=("📝 $entry")
   done
+  CHANGELOG_ENTRIES+=("")
+fi
+
+# Add expandable "All Changes" section at the end
+if [[ ${#ALL_COMMITS[@]} -gt 0 ]]; then
+  CHANGELOG_ENTRIES+=("<details>")
+  CHANGELOG_ENTRIES+=("<summary>All Changes</summary>")
+  CHANGELOG_ENTRIES+=("")
+  for entry in "${ALL_COMMITS[@]}"; do
+    CHANGELOG_ENTRIES+=("- $entry")
+  done
+  CHANGELOG_ENTRIES+=("")
+  CHANGELOG_ENTRIES+=("</details>")
   CHANGELOG_ENTRIES+=("")
 fi
 

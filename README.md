@@ -1,6 +1,6 @@
 # config-sync
 
-Sync configuration files across machines using git.
+Do you have multiple machines and felt the fatigue of syncing your config across all of them? The config no longer in one `~/.config` folder, now they could be your `~/.claude/CLAUDE.md` and its skills, or across multiple files and folders. This tool solves your problem.
 
 ## ⚠️ IMPORTANT SECURITY WARNINGS ⚠️
 
