@@ -1,0 +1,6 @@
+[tools]
+go = "latest"
+
+[tasks.build]
+description = "Build the go binary"
+run = "go build"

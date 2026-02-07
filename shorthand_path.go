@@ -13,7 +13,7 @@ type ShorthandPath struct {
 	TildePath string
 }
 
-// Suffix returns a new ShorthandPath with the given suffix appended to both paths
+// New creates a ShorthandPath from a path (supports tilde notation)
 func (ShorthandPath) New(str string) ShorthandPath {
 	return ShorthandPath{
 		TildePath: collapseToTilde(str),
