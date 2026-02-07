@@ -44,6 +44,13 @@ else
   COMMIT_RANGE="HEAD"
 fi
 
+# Get repo URL for links
+REPO_URL=$(git config --get remote.origin.url)
+if [[ "$REPO_URL" =~ git@github.com:(.+)\.git$ ]]; then
+  REPO_URL="https://github.com/${BASH_REMATCH[1]}"
+fi
+COMMIT_RANGE_LINK="${REPO_URL}/compare/${LATEST_TAG}...${VERSION_TAG}"
+
 # Get commits and categorize them
 echo "Parsing commits from ${COMMIT_RANGE}..."
 echo ""
@@ -53,11 +60,22 @@ FIXED=()
 CHANGED=()
 OTHER=()
 
-while IFS= read -r commit; do
-  # Try conventional commit format first: type: description or type(scope): description
-  if [[ "$commit" =~ ^([a-z]+)(\(.+\)):\s+(.+)$ ]]; then
-    TYPE="${BASH_REMATCH[1]}"
-    MESSAGE="${BASH_REMATCH[3]}"
+# Get commits into a temp file
+TEMP_COMMITS=$(mktemp)
+git log "${COMMIT_RANGE}" --pretty=format:"%s" > "$TEMP_COMMITS"
+
+# Get commit hashes into another temp file
+TEMP_HASHES=$(mktemp)
+git log "${COMMIT_RANGE}" --pretty=format:"%s|%H" > "$TEMP_HASHES"
+
+while IFS= read -r commit || [[ -n "$commit" ]]; do
+  # Check if commit has a colon (conventional commit format: type: message)
+  if [[ "$commit" == *": "* ]]; then
+    # Extract type (before first colon) and message (after colon and space)
+    TYPE="${commit%%:*}"
+    MESSAGE="${commit#*: }"
+    # Remove optional (scope) from type if present
+    TYPE="${TYPE%%\(*}"
 
     case "$TYPE" in
       feat|add)
@@ -77,10 +95,17 @@ while IFS= read -r commit; do
     # Non-conventional commit - add as-is to Other
     OTHER+=("$commit")
   fi
-done < <(git log "${COMMIT_RANGE}" --pretty=format:"%s" --reverse)
+done < "$TEMP_COMMITS"
 
-# Track all commits for the "All Changes" section
-ALL_COMMITS=()
+rm -f "$TEMP_COMMITS"
+
+# Helper function to get hash for a message
+get_hash() {
+  local msg="$1"
+  # Use grep with fixed string matching for the message
+  local hash=$(grep -F "$msg" "$TEMP_HASHES" | cut -d'|' -f2 | head -1)
+  echo "$hash"
+}
 
 # Build changelog entries
 CHANGELOG_ENTRIES=()
@@ -88,8 +113,9 @@ CHANGELOG_ENTRIES=()
 if [[ ${#ADDED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Added")
   for entry in "${ADDED[@]}"; do
-    CHANGELOG_ENTRIES+=("- $entry")
-    ALL_COMMITS+=("✨ $entry")
+    HASH=$(get_hash "$entry")
+    SHORT_HASH="${HASH:0:7}"
+    CHANGELOG_ENTRIES+=("- $entry ([${SHORT_HASH}](${REPO_URL}/commit/${HASH}))")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -97,8 +123,9 @@ fi
 if [[ ${#FIXED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Fixed")
   for entry in "${FIXED[@]}"; do
-    CHANGELOG_ENTRIES+=("- $entry")
-    ALL_COMMITS+=("🐛 $entry")
+    HASH=$(get_hash "$entry")
+    SHORT_HASH="${HASH:0:7}"
+    CHANGELOG_ENTRIES+=("- $entry ([${SHORT_HASH}](${REPO_URL}/commit/${HASH}))")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -106,8 +133,9 @@ fi
 if [[ ${#CHANGED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Changed")
   for entry in "${CHANGED[@]}"; do
-    CHANGELOG_ENTRIES+=("- $entry")
-    ALL_COMMITS+=("♻️ $entry")
+    HASH=$(get_hash "$entry")
+    SHORT_HASH="${HASH:0:7}"
+    CHANGELOG_ENTRIES+=("- $entry ([${SHORT_HASH}](${REPO_URL}/commit/${HASH}))")
   done
   CHANGELOG_ENTRIES+=("")
 fi
@@ -115,24 +143,14 @@ fi
 if [[ ${#OTHER[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("### Other")
   for entry in "${OTHER[@]}"; do
-    CHANGELOG_ENTRIES+=("- $entry")
-    ALL_COMMITS+=("📝 $entry")
+    HASH=$(get_hash "$entry")
+    SHORT_HASH="${HASH:0:7}"
+    CHANGELOG_ENTRIES+=("- $entry ([${SHORT_HASH}](${REPO_URL}/commit/${HASH}))")
   done
   CHANGELOG_ENTRIES+=("")
 fi
 
-# Add expandable "All Changes" section at the end
-if [[ ${#ALL_COMMITS[@]} -gt 0 ]]; then
-  CHANGELOG_ENTRIES+=("<details>")
-  CHANGELOG_ENTRIES+=("<summary>All Changes</summary>")
-  CHANGELOG_ENTRIES+=("")
-  for entry in "${ALL_COMMITS[@]}"; do
-    CHANGELOG_ENTRIES+=("- $entry")
-  done
-  CHANGELOG_ENTRIES+=("")
-  CHANGELOG_ENTRIES+=("</details>")
-  CHANGELOG_ENTRIES+=("")
-fi
+rm -f "$TEMP_HASHES"
 
 # Get current date
 DATE=$(date -u +"%Y-%m-%d")
@@ -156,6 +174,10 @@ TEMP_FILE=$(mktemp)
 {
   echo "## [$VERSION_TAG] - $DATE"
   echo ""
+  if [[ -n "$COMMIT_RANGE_LINK" ]]; then
+    echo "[Full Changelog](${COMMIT_RANGE_LINK})"
+    echo ""
+  fi
   for entry in "${CHANGELOG_ENTRIES[@]}"; do
     echo "$entry"
   done
