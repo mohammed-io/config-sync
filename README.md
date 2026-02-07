@@ -21,6 +21,40 @@ Do you have multiple machines and felt the fatigue of syncing your config across
 
 Use a **private** repository OR consider using secret management tools (like `envchain`, `1password`, `vault`, etc.) for sensitive data.
 
+### Optional: Encrypt Your Repository
+
+If your configs contain sensitive data and you want extra protection, consider encrypting your repository with [git-crypt](https://github.com/AGWA/git-crypt).
+
+Once enabled, files are encrypted on `push` and decrypted on `pull` automatically. Your `config-sync` commands work exactly the same - no changes needed.
+
+**First time setup:**
+
+```bash
+# Install git-crypt
+brew install git-crypt           # macOS
+sudo apt install git-crypt       # Ubuntu/Debian
+
+# Go to your sync folder and enable encryption
+cd ~/.config-sync
+git-crypt init
+
+# Mark synced files for encryption
+echo "synced-files/** filter=git-crypt diff=git-crypt" >> .gitattributes
+
+# Save the key somewhere safe (you'll need it on other machines)
+git-crypt export-key ~/config-sync-key
+```
+
+**On each of your other machines:**
+
+```bash
+# After cloning, unlock the repository with your key
+cd ~/.config-sync
+git-crypt unlock ~/config-sync-key
+```
+
+> **What this protects:** Your files are encrypted in GitHub and in git history. They're still decrypted on your machine, so keep your `config-sync-key` file safe and don't share it.
+
 ### No Liability
 
 This software is provided "as is", without warranty of any kind. The authors and contributors are **not liable** for any damages, data loss, security breaches, or issues arising from the use of this software. You are solely responsible for:
