@@ -1,4 +1,4 @@
-module config-sync
+module github.com/mohammed-io/config-sync
 
 go 1.25.4
 
