@@ -11,26 +11,43 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-VERSION="v$1"
-VERSION_NO_V="$1"
+VERSION="$1"
 
-echo "Releasing $VERSION..."
+# Reject if user included 'v' prefix
+if [[ "$VERSION" == v* ]]; then
+  echo "Error: Version should not include 'v' prefix"
+  echo "Use: $0 0.0.1"
+  echo "Not: $0 v0.0.1"
+  exit 1
+fi
+
+# Validate semver format (X.Y.Z where X,Y,Z are numbers)
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: Invalid version format '$VERSION'"
+  echo "Version must be in semantic versioning format: X.Y.Z"
+  echo "Example: 0.0.1, 1.2.3, 2.0.0"
+  exit 1
+fi
+
+VERSION_TAG="v$VERSION"
+
+echo "Releasing $VERSION_TAG..."
 
 # Update version in version.go
-sed -i.bak "s/var Version = \".*\"/var Version = \"$VERSION\"/" version.go
+sed -i.bak "s/var Version = \".*\"/var Version = \"$VERSION_TAG\"/" version.go
 rm -f version.go.bak
 
 # Update README install command with new version
-sed -i.bak "s/go install github.com\/mohammed-io\/config-sync@v[0-9.]*/go install github.com\/mohammed-io\/config-sync@$VERSION/" README.md
+sed -i.bak "s/go install github.com\/mohammed-io\/config-sync@v[0-9.]*/go install github.com\/mohammed-io\/config-sync@$VERSION_TAG/" README.md
 rm -f README.md.bak
 
 # Commit changes
 git add version.go README.md
-git commit -m "chore: release $VERSION"
+git commit -m "chore: release $VERSION_TAG"
 
 # Create and push tag
-git tag "$VERSION"
+git tag "$VERSION_TAG"
 git push origin main
-git push origin "$VERSION"
+git push origin "$VERSION_TAG"
 
-echo "✓ Released $VERSION"
+echo "✓ Released $VERSION_TAG"
