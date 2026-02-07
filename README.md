@@ -29,7 +29,7 @@ This software is provided "as is", without warranty of any kind. The authors and
 ## Installation
 
 ```bash
-go install github.com/mohammed-io/config-sync@latest
+go install github.com/mohammed-io/config-sync@v0.0.1
 ```
 
 Or build from source:

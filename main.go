@@ -114,10 +114,13 @@ var rootCmd = &cobra.Command{
 	Use:   "config-sync",
 	Short: "Sync config files across machines",
 	Long: `config-sync helps you track and sync configuration files across machines.
-Files are stored in ~/.config-sync/synced-files and can be managed with git.`,
+Files are stored in ~/.config-sync/synced-files and can be managed with git.
+
+Version: ` + Version,
+	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip initialization for help and completion commands
-		if cmd.Name() == "help" || cmd.Name() == "completion" {
+		if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
 			return nil
 		}
 		return appConfig.Initialize(configFolder())
