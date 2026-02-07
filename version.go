@@ -1,4 +1,4 @@
 package main
 
 // Version is set by the release script
-var Version = "v0.0.1"
+var Version = "vv0.0.2"
