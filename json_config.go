@@ -145,6 +145,40 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
+// copyDir recursively copies a directory from src to dst
+func copyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // SyncFiles copies tracked files to the synced-files folder
 func (c *JsonConfig) SyncFiles() error {
 	if err := c.checkInitialized(); err != nil {
@@ -164,17 +198,29 @@ func (c *JsonConfig) SyncFiles() error {
 		hash := md5Hash(tildePath)
 		destDir := filepath.Join(syncDir.FullPath, hash)
 
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", destDir, err)
+		srcInfo, err := os.Stat(srcPath.FullPath)
+		if err != nil {
+			return fmt.Errorf("failed to stat %s: %w", tildePath, err)
 		}
 
-		// Copy file
-		destPath := filepath.Join(destDir, filepath.Base(srcPath.FullPath))
-		if err := copyFile(srcPath.FullPath, destPath); err != nil {
-			return fmt.Errorf("failed to copy %s: %w", tildePath, err)
+		if srcInfo.IsDir() {
+			// For directories, copy the entire contents
+			destPath := filepath.Join(destDir, filepath.Base(srcPath.FullPath))
+			if err := copyDir(srcPath.FullPath, destPath); err != nil {
+				return fmt.Errorf("failed to copy directory %s: %w", tildePath, err)
+			}
+			log.Printf("Synced directory: %s -> %s/%s\n", tildePath, hash, filepath.Base(srcPath.FullPath))
+		} else {
+			// For files, copy the file
+			if err := os.MkdirAll(destDir, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", destDir, err)
+			}
+			destPath := filepath.Join(destDir, filepath.Base(srcPath.FullPath))
+			if err := copyFile(srcPath.FullPath, destPath); err != nil {
+				return fmt.Errorf("failed to copy %s: %w", tildePath, err)
+			}
+			log.Printf("Synced file: %s -> %s/%s\n", tildePath, hash, filepath.Base(srcPath.FullPath))
 		}
-
-		log.Printf("Synced: %s -> %s/%s\n", tildePath, hash, filepath.Base(srcPath.FullPath))
 	}
 
 	return nil
