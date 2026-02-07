@@ -259,9 +259,8 @@ func (c *JsonConfig) RestoreFiles() error {
 		hash := md5Hash(tildePath)
 		srcDir := filepath.Join(syncDir.FullPath, hash)
 
-		// Check if source exists
-		srcInfo, err := os.Stat(srcDir)
-		if err != nil {
+		// Check if hash folder exists
+		if _, err := os.Stat(srcDir); err != nil {
 			if os.IsNotExist(err) {
 				log.Printf("Skipping %s: not found in synced-files\n", tildePath)
 				continue
@@ -274,12 +273,24 @@ func (c *JsonConfig) RestoreFiles() error {
 			return fmt.Errorf("failed to create parent dir for %s: %w", tildePath, err)
 		}
 
-		if srcInfo.IsDir() {
-			// For directories, copy the entire directory
-			srcPath := filepath.Join(srcDir, filepath.Base(destPath.FullPath))
-			if _, err := os.Stat(srcPath); err != nil {
+		// Check what's inside the hash folder to determine if it's a file or directory
+		baseName := filepath.Base(destPath.FullPath)
+		srcPath := filepath.Join(srcDir, baseName)
+
+		srcInfo, err := os.Stat(srcPath)
+		if err != nil {
+			if os.IsNotExist(err) {
 				log.Printf("Skipping %s: source not found\n", tildePath)
 				continue
+			}
+			return fmt.Errorf("failed to stat source for %s: %w", tildePath, err)
+		}
+
+		if srcInfo.IsDir() {
+			// For directories, copy the entire directory
+			// Remove destination first if it exists as a file
+			if destInfo, err := os.Stat(destPath.FullPath); err == nil && !destInfo.IsDir() {
+				os.Remove(destPath.FullPath)
 			}
 			if err := copyDir(srcPath, destPath.FullPath); err != nil {
 				return fmt.Errorf("failed to restore directory %s: %w", tildePath, err)
@@ -287,13 +298,12 @@ func (c *JsonConfig) RestoreFiles() error {
 			log.Printf("Restored directory: %s\n", tildePath)
 		} else {
 			// For files, copy the file
-			srcFile := filepath.Join(srcDir, filepath.Base(destPath.FullPath))
-			if _, err := os.Stat(srcFile); err != nil {
-				log.Printf("Skipping %s: source not found\n", tildePath)
-				continue
+			// Remove destination first if it exists as a directory
+			if destInfo, err := os.Stat(destPath.FullPath); err == nil && destInfo.IsDir() {
+				os.RemoveAll(destPath.FullPath)
 			}
-			if err := copyFile(srcFile, destPath.FullPath); err != nil {
-				return fmt.Errorf("failed to restore %s: %w", tildePath, err)
+			if err := copyFile(srcPath, destPath.FullPath); err != nil {
+				return fmt.Errorf("failed to restore file %s: %w", tildePath, err)
 			}
 			log.Printf("Restored file: %s\n", tildePath)
 		}
