@@ -20,7 +20,12 @@ func configFolder() ShorthandPath {
 var trackCmd = &cobra.Command{
 	Use:   "track [files...]",
 	Short: "Add files to sync config",
-	Args:  cobra.MinimumNArgs(1),
+	Long: "Add files to be tracked and synced across machines.\n\n" +
+		"WARNING: Be careful not to track files containing secrets, API keys, passwords,\n" +
+		"or sensitive data. These files will be stored in a git repository and potentially\n" +
+		"shared with others. Only track configuration files that are safe to be public or\n" +
+		"shared within your trusted team.",
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := appConfig.Track(args); err != nil {
 			log.Fatalf("Track failed: %v", err)
