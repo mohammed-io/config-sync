@@ -47,7 +47,7 @@ git commit -m "chore: release $VERSION_TAG"
 
 # Create and push tag
 git tag "$VERSION_TAG"
-git push origin main
+git push origin main --tags
 git push origin "$VERSION_TAG"
 
 echo "✓ Released $VERSION_TAG"
