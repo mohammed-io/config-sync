@@ -2,6 +2,10 @@
 
 Do you have multiple machines and felt the fatigue of syncing your config across all of them? The config no longer in one `~/.config` folder, now they could be your `~/.claude/CLAUDE.md` and its skills, or across multiple files and folders. This tool solves your problem.
 
+## Limitations
+
+- You cannot change the config destination, it always reads the config from `~/.config`
+
 ## ⚠️ IMPORTANT SECURITY WARNINGS ⚠️
 
 ### Be Careful What You Track
@@ -29,7 +33,7 @@ This software is provided "as is", without warranty of any kind. The authors and
 ## Installation
 
 ```bash
-go install github.com/mohammed-io/config-sync@v0.0.12
+go install github.com/mohammed-io/config-sync@v0.0.11
 ```
 
 Or build from source:
