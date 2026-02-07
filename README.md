@@ -105,6 +105,42 @@ config-sync pull
 # Copy them to the right location manually
 ```
 
+## Development
+
+This project uses [mise](https://mise.jdx.dev/) for tool management.
+
+### Setup
+
+```bash
+# Install mise (if not already installed)
+curl https://mise.run | sh
+
+# Install Go and other tools via mise
+mise install
+```
+
+### Building
+
+```bash
+# Build the binary
+go build -o config-sync .
+
+# Or use mise to run tasks
+mise run build
+```
+
+### Project Structure
+
+```
+config-sync/
+├── main.go              # CLI commands and main entry point
+├── json_config.go       # Config management (JsonConfig)
+├── git_runner.go        # Git operations (GitRunner interface)
+├── shorthand_path.go    # Path utilities (tilde expansion)
+├── README.md
+└── LICENSE
+```
+
 ## How It Works
 
 - Tracked files are stored in `~/.config-sync/synced-files/`
