@@ -97,12 +97,17 @@ var setOriginCmd = &cobra.Command{
 		"Example:\n  config-sync set-origin-repo git@github.com:user/config-repo.git",
 	Run: func(cmd *cobra.Command, args []string) {
 		git := NewGitRunner()
-		if err := git.SetOrigin(args[0]); err != nil {
+		force, _ := cmd.Flags().GetBool("force")
+		if err := git.SetOrigin(args[0], force); err != nil {
 			log.Fatalf("Set origin failed: %v", err)
 		}
 		log.Printf("Origin set to: %s\n", args[0])
 		log.Println("You can now use 'config-sync push' to sync your files.")
 	},
+}
+
+func init() {
+	setOriginCmd.Flags().Bool("force", false, "Bypass public repository warning")
 }
 
 var rootCmd = &cobra.Command{

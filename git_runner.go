@@ -3,16 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // GitRunner defines git operations
 type GitRunner interface {
 	Pull() error
 	Push() error
-	SetOrigin(url string) error
+	SetOrigin(url string, force bool) error
 	Add() error
 	Commit(message string) error
 	AddAndPush(message string) error
@@ -42,7 +44,16 @@ func (g RealGitRunner) Push() error {
 	return g.run("push")
 }
 
-func (g RealGitRunner) SetOrigin(url string) error {
+func (g RealGitRunner) SetOrigin(url string, force bool) error {
+	// Check if repo is public (only for SSH URLs that can be converted to HTTPS)
+	if !force {
+		if httpsURL := sshToHTTPS(url); httpsURL != "" {
+			if isPublicRepo(httpsURL) {
+				return fmt.Errorf("repository appears to be public (accessible without authentication).\nUse --force to add this origin if you're sure")
+			}
+		}
+	}
+
 	// Auto-init if needed
 	if _, err := os.Stat(filepath.Join(g.dir, ".git")); err != nil {
 		if err := g.Init(); err != nil {
@@ -52,6 +63,32 @@ func (g RealGitRunner) SetOrigin(url string) error {
 
 	// Set the remote
 	return g.run("remote", "add", "origin", url)
+}
+
+// sshToHTTPS converts git@github.com:user/repo.git to https://github.com/user/repo
+// Returns empty string if not an SSH URL
+func sshToHTTPS(url string) string {
+	if strings.HasPrefix(url, "git@") {
+		// git@github.com:user/repo.git -> https://github.com/user/repo
+		parts := strings.TrimPrefix(url, "git@")
+		colonIdx := strings.Index(parts, ":")
+		if colonIdx > 0 {
+			host := parts[:colonIdx]
+			repo := strings.TrimSuffix(parts[colonIdx+1:], ".git")
+			return fmt.Sprintf("https://%s/%s", host, repo)
+		}
+	}
+	return ""
+}
+
+// isPublicRepo checks if a repo is publicly accessible via HTTP
+func isPublicRepo(httpsURL string) bool {
+	resp, err := http.Head(httpsURL)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == 200
 }
 
 func (g RealGitRunner) Add() error {
