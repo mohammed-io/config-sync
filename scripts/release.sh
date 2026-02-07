@@ -99,12 +99,19 @@ done < "$TEMP_COMMITS"
 
 rm -f "$TEMP_COMMITS"
 
-# Helper function to get hash for a message
+# Helper function to get hash for a message (must be called before TEMP_HASHES is deleted)
+# Also stores TEMP_HASHES path globally so subshells can find it
+_get_hash_file="$TEMP_HASHES"
+
 get_hash() {
   local msg="$1"
   # Use grep with fixed string matching for the message
-  local hash=$(grep -F "$msg" "$TEMP_HASHES" | cut -d'|' -f2 | head -1)
-  echo "$hash"
+  if [[ -f "$_get_hash_file" ]]; then
+    local hash=$(grep -F "$msg" "$_get_hash_file" | cut -d'|' -f2 | head -1)
+    echo "$hash"
+  else
+    echo ""
+  fi
 }
 
 # Build changelog entries
@@ -140,16 +147,22 @@ if [[ ${#CHANGED[@]} -gt 0 ]]; then
   CHANGELOG_ENTRIES+=("")
 fi
 
+# "Other" section as expandable details
 if [[ ${#OTHER[@]} -gt 0 ]]; then
-  CHANGELOG_ENTRIES+=("### Other")
+  CHANGELOG_ENTRIES+=("<details>")
+  CHANGELOG_ENTRIES+=("<summary>Other</summary>")
+  CHANGELOG_ENTRIES+=("")
   for entry in "${OTHER[@]}"; do
     HASH=$(get_hash "$entry")
     SHORT_HASH="${HASH:0:7}"
     CHANGELOG_ENTRIES+=("- $entry ([${SHORT_HASH}](${REPO_URL}/commit/${HASH}))")
   done
   CHANGELOG_ENTRIES+=("")
+  CHANGELOG_ENTRIES+=("</details>")
+  CHANGELOG_ENTRIES+=("")
 fi
 
+# Clean up temp hash file (must be after all get_hash calls)
 rm -f "$TEMP_HASHES"
 
 # Get current date
