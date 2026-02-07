@@ -36,7 +36,7 @@ func (g RealGitRunner) run(args ...string) error {
 
 func (g RealGitRunner) Pull() error {
 	log.Printf("Pulling from %s\n", configFolder().TildePath)
-	return g.run("pull")
+	return g.run("pull main main")
 }
 
 func (g RealGitRunner) Push() error {
