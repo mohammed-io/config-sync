@@ -328,3 +328,44 @@ func (c *JsonConfig) RestoreFiles() error {
 
 	return nil
 }
+
+// HasUnsyncedChanges checks if any tracked source files have changed since last sync
+// Compares mtime+size of source files against synced-files/ versions
+// Non-destructive: doesn't modify any files
+func (c *JsonConfig) HasUnsyncedChanges() (bool, error) {
+	if err := c.checkInitialized(); err != nil {
+		return false, err
+	}
+
+	syncDir := c.folder.Suffix("synced-files")
+
+	for tildePath := range c.Files {
+		srcPath := ShorthandPath{}.New(tildePath)
+		hash := md5Hash(tildePath)
+		baseName := filepath.Base(srcPath.FullPath)
+		syncedPath := filepath.Join(syncDir.FullPath, hash, baseName)
+
+		// Get source file info
+		srcInfo, err := os.Stat(srcPath.FullPath)
+		if err != nil {
+			// Source file doesn't exist - consider it unchanged
+			// (user may have deleted it, we'll handle that on push)
+			continue
+		}
+
+		// Get synced file info
+		syncedInfo, err := os.Stat(syncedPath)
+		if err != nil {
+			// Synced file doesn't exist - file is new/changed
+			return true, nil
+		}
+
+		// Compare mtime and size
+		// Source has changed if its mtime is newer than synced (modified after sync)
+		if srcInfo.ModTime().After(syncedInfo.ModTime()) || srcInfo.Size() != syncedInfo.Size() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

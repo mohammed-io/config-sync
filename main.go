@@ -205,6 +205,11 @@ var checkUpdatesCmd = &cobra.Command{
 			return // Silent exit if not initialized
 		}
 
+		// Load config to check for unsynced source files
+		_ = appConfig.Initialize(configFolder())
+
+		hasUnsynced, _ := appConfig.HasUnsyncedChanges()
+
 		hasUnpushed, err := git.HasUnpushedChanges()
 		if err != nil {
 			return // Silent on error
@@ -215,26 +220,25 @@ var checkUpdatesCmd = &cobra.Command{
 			return // Silent on error
 		}
 
-		if !hasUnpushed && !hasUnpulled {
+		if !hasUnsynced && !hasUnpushed && !hasUnpulled {
 			return // Silent exit - everything up to date
 		}
 
 		// Build message
 		var msgs []string
-		if hasUnpushed && hasUnpulled {
+		if hasUnsynced || hasUnpushed || hasUnpulled {
 			msgs = append(msgs, "Your config is out of sync:")
-			msgs = append(msgs, "  • You have local changes not pushed")
-			msgs = append(msgs, "  • There are remote changes not pulled")
-			msgs = append(msgs, "")
-			msgs = append(msgs, "Run: config-sync pull && config-sync push")
-		} else if hasUnpushed {
-			msgs = append(msgs, "You have local changes not pushed")
+			if hasUnsynced {
+				msgs = append(msgs, "  • Some tracked files have changed")
+			}
+			if hasUnpushed {
+				msgs = append(msgs, "  • You have local changes not pushed")
+			}
+			if hasUnpulled {
+				msgs = append(msgs, "  • There are remote changes not pulled")
+			}
 			msgs = append(msgs, "")
 			msgs = append(msgs, "Run: config-sync push")
-		} else if hasUnpulled {
-			msgs = append(msgs, "There are remote changes not pulled")
-			msgs = append(msgs, "")
-			msgs = append(msgs, "Run: config-sync pull")
 		}
 
 		for _, msg := range msgs {
