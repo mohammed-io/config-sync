@@ -1,3 +1,16 @@
+## [v0.0.15] - 2026-02-09
+
+[Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.14...v0.0.15)
+
+<details>
+<summary>Other</summary>
+
+- Do file check before comparison ([8df37be](https://github.com/mohammed-io/config-sync/commit/8df37be11f87b26c4547e7c6e73f2982dc91d4c1))
+- A command for checking for updates ([360c380](https://github.com/mohammed-io/config-sync/commit/360c3800d6e9e5a1f524ec89b1b3d61c437b844c))
+
+</details>
+
+
 ## [v0.0.14] - 2026-02-09
 
 [Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.13...v0.0.14)
