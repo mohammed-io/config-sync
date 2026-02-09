@@ -47,6 +47,7 @@ type GitRunner interface {
 	Commit(message string) error
 	AddAndPush(message string) error
 	Init() error
+	Clone(url string) error
 }
 
 // RealGitRunner executes actual git commands
@@ -163,6 +164,28 @@ func (g RealGitRunner) Init() error {
 	}
 	log.Printf("Initializing git repository in %s\n", configFolder().TildePath)
 	return g.run("init")
+}
+
+func (g RealGitRunner) Clone(url string) error {
+	// Check if directory already has content
+	if _, err := os.Stat(g.dir); err == nil {
+		// Check if it's empty or has .git
+		entries, err := os.ReadDir(g.dir)
+		if err == nil && len(entries) > 0 {
+			return fmt.Errorf("directory %s already exists and is not empty", configFolder().TildePath)
+		}
+	}
+
+	log.Printf("Cloning repository into %s\n", configFolder().TildePath)
+	cmd := exec.Command("git", "clone", url, g.dir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git clone failed: %w", err)
+	}
+
+	log.Printf("Successfully cloned repository to %s\n", configFolder().TildePath)
+	return nil
 }
 
 // NewGitRunner creates a new GitRunner for the config folder

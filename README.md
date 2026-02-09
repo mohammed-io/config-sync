@@ -80,15 +80,31 @@ go build -o config-sync .
 
 ## Usage
 
-### 1. Set the Git Repository
+### First Time Setup
+
+**Option A: Start fresh on this machine**
+
+```bash
+config-sync init
+```
+
+This creates the directory structure and local git repository at `~/.config-sync`.
+
+**Option B: Clone existing repository**
+
+```bash
+config-sync init-from git@github.com:your-username/your-config-repo.git
+```
+
+This clones an existing config-sync repository to `~/.config-sync`.
+
+### Set Remote Repository (for fresh installs)
 
 ```bash
 config-sync set-origin-repo git@github.com:your-username/your-config-repo.git
 ```
 
-This initializes a git repository in `~/.config-sync` and sets the remote origin.
-
-### 2. Track Files
+### Track Files
 
 ```bash
 # Track a single file
@@ -106,13 +122,13 @@ config-sync push
 
 This copies tracked files to `~/.config-sync/synced-files/`, commits, and pushes to git.
 
-### 4. Pull on Other Machines
+### Pull on Other Machines
 
 ```bash
 config-sync pull
 ```
 
-Then manually copy files from `~/.config-sync/synced-files/` to their destinations (or create a restore command).
+This restores files from `~/.config-sync/synced-files/` to their original locations.
 
 ### Untrack Files
 
@@ -122,7 +138,12 @@ config-sync untrack ~/.vimrc
 
 ## Example: Syncing Claude Code Config
 
+**First machine:**
+
 ```bash
+# Initialize (fresh start)
+config-sync init
+
 # Set up a private repo (IMPORTANT: use private for sensitive configs)
 config-sync set-origin-repo git@github.com:your-username/my-config.git
 
@@ -133,14 +154,14 @@ config-sync track ~/.claude/CLAUDE.md
 config-sync push
 ```
 
-On another machine:
+**On another machine:**
 
 ```bash
-# Clone or pull
-config-sync pull
+# Clone the existing repository
+config-sync init-from git@github.com:your-username/my-config.git
 
-# Files are now in ~/.config-sync/synced-files/
-# Copy them to the right location manually
+# Pull and restore files
+config-sync pull
 ```
 
 ## Development

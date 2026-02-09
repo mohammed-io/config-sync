@@ -19,6 +19,11 @@ type JsonConfig struct {
 	folder      ShorthandPath
 }
 
+// IsInitialized returns whether the config has been initialized
+func (c *JsonConfig) IsInitialized() bool {
+	return c.initialized
+}
+
 // checkInitialized returns an error if the config is not initialized
 func (c *JsonConfig) checkInitialized() error {
 	if !c.initialized {
@@ -27,27 +32,17 @@ func (c *JsonConfig) checkInitialized() error {
 	return nil
 }
 
-// Initialize loads or creates the config at the given folder
+// Initialize loads the config at the given folder
+// Returns os.ErrNotExist if the config file doesn't exist
 func (c *JsonConfig) Initialize(folder ShorthandPath) error {
-	if err := os.MkdirAll(folder.Suffix("synced-files").FullPath, 0755); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
-
 	configPath := folder.Suffix("config.json")
 
+	// Check if config exists
 	if _, err := os.Stat(filepath.Clean(configPath.FullPath)); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Config is not found at %s, initializing...\n", folder.TildePath)
-
-		var formattedJson bytes.Buffer
-		json.Indent(&formattedJson, []byte(`{"files": {}}`), "", "  ")
-
-		if err := os.WriteFile(configPath.FullPath, formattedJson.Bytes(), 0755); err != nil {
-			return err
-		}
-	} else {
-		log.Printf("Config is detected at %s\n", folder.TildePath)
+		return os.ErrNotExist
 	}
 
+	// Load existing config
 	fileBytes, err := os.ReadFile(configPath.FullPath)
 	if err != nil {
 		return fmt.Errorf("could not read the file %s: %w", configPath, err)
@@ -59,7 +54,29 @@ func (c *JsonConfig) Initialize(folder ShorthandPath) error {
 
 	c.initialized = true
 	c.folder = folder
-	log.Printf("Config is initialized from %s\n", folder.TildePath)
+	return nil
+}
+
+// Create creates a new config at the given folder
+func (c *JsonConfig) Create(folder ShorthandPath) error {
+	if err := os.MkdirAll(folder.Suffix("synced-files").FullPath, 0755); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
+
+	configPath := folder.Suffix("config.json")
+
+	var formattedJson bytes.Buffer
+	json.Indent(&formattedJson, []byte(`{"files": {}}`), "", "  ")
+
+	if err := os.WriteFile(configPath.FullPath, formattedJson.Bytes(), 0755); err != nil {
+		return err
+	}
+
+	// Load the newly created config
+	c.Files = make(map[string]string)
+	c.initialized = true
+	c.folder = folder
+
 	return nil
 }
 

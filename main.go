@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -110,8 +111,87 @@ var setOriginCmd = &cobra.Command{
 	},
 }
 
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Initialize config-sync for the first time",
+	Long: "Initialize config-sync by creating the necessary directory structure and git repository.\n\n" +
+		"This creates:\n" +
+		"  - ~/.config-sync/ directory\n" +
+		"  - config.json for tracking files\n" +
+		"  - synced-files/ directory for your configs\n" +
+		"  - Local git repository\n\n" +
+		"After init, use 'set-origin-repo' to connect to a remote repository.",
+	Run: func(cmd *cobra.Command, args []string) {
+		git := NewGitRunner()
+
+		// Initialize git repo
+		if err := git.Init(); err != nil {
+			log.Fatalf("Git init failed: %v", err)
+		}
+
+		// Create config
+		if err := appConfig.Create(configFolder()); err != nil {
+			log.Fatalf("Config creation failed: %v", err)
+		}
+
+		log.Printf("\n✓ config-sync initialized at %s\n", configFolder().TildePath)
+		log.Printf("Next steps:")
+		log.Printf("  config-sync set-origin-repo <url>  # Connect to a remote repo")
+		log.Printf("  config-sync track ~/.vimrc          # Start tracking files")
+		log.Printf("  config-sync push                    # Push to remote")
+	},
+}
+
+var initFromCmd = &cobra.Command{
+	Use:   "init-from <url>",
+	Short: "Clone an existing config-sync repository",
+	Long: "Clone an existing config-sync repository from a git URL.\n\n" +
+		"This will clone the repository into ~/.config-sync, making it ready to use.\n" +
+		"Use this on a new machine to quickly set up config-sync.\n\n" +
+		"Example:\n  config-sync init-from git@github.com:user/config-repo.git",
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		git := NewGitRunner()
+		force, _ := cmd.Flags().GetBool("force")
+
+		// Security check: warn if repo appears to be public
+		if !force {
+			if httpsURL := sshToHTTPS(args[0]); httpsURL != "" {
+				if isPublicRepo(httpsURL) {
+					log.Printf("⚠️  WARNING: Repository appears to be publicly accessible!\n")
+					log.Printf("If this repo contains sensitive configs, use --force only if you understand the risks.")
+					return
+				}
+			}
+		}
+
+		if err := git.Clone(args[0]); err != nil {
+			log.Fatalf("Clone failed: %v", err)
+		}
+
+		// Load the config after cloning
+		if err := appConfig.Initialize(configFolder()); err != nil {
+			if os.IsNotExist(err) {
+				// Config doesn't exist in cloned repo, create it
+				log.Printf("Config not found in cloned repository, creating new config...")
+				if err := appConfig.Create(configFolder()); err != nil {
+					log.Fatalf("Config creation failed: %v", err)
+				}
+			} else {
+				log.Fatalf("Config initialization failed: %v", err)
+			}
+		}
+
+		log.Printf("\n✓ Repository cloned successfully!")
+		log.Printf("You can now use:")
+		log.Printf("  config-sync pull    # To sync files from the repo")
+		log.Printf("  config-sync track  # To add new files to track")
+	},
+}
+
 func init() {
 	setOriginCmd.Flags().Bool("force", false, "Bypass public repository warning")
+	initFromCmd.Flags().Bool("force", false, "Bypass public repository warning")
 }
 
 var rootCmd = &cobra.Command{
@@ -123,15 +203,31 @@ Files are stored in ~/.config-sync/synced-files and can be managed with git.
 Version: ` + Version,
 	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip initialization for help and completion commands
-		if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
+		// Skip initialization check for init, init-from, help, completion, and version commands
+		skipInitCheck := map[string]bool{
+			"init":       true,
+			"init-from":  true,
+			"help":       true,
+			"completion": true,
+			"version":    true,
+		}
+		if skipInitCheck[cmd.Name()] {
 			return nil
 		}
-		return appConfig.Initialize(configFolder())
+
+		// Try to load existing config
+		err := appConfig.Initialize(configFolder())
+		if err != nil {
+			if os.IsNotExist(err) || !appConfig.IsInitialized() {
+				return fmt.Errorf("config not initialized. Run one of:\n  config-sync init              # Start fresh\n  config-sync init-from <url>   # Clone existing repo")
+			}
+			return err
+		}
+		return nil
 	},
 }
 
 func main() {
-	rootCmd.AddCommand(trackCmd, untrackCmd, pullCmd, pushCmd, setOriginCmd)
+	rootCmd.AddCommand(initCmd, initFromCmd, trackCmd, untrackCmd, pullCmd, pushCmd, setOriginCmd)
 	rootCmd.Execute()
 }
