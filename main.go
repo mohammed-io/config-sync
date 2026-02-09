@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -189,6 +190,59 @@ var initFromCmd = &cobra.Command{
 	},
 }
 
+var checkUpdatesCmd = &cobra.Command{
+	Use:   "check-updates",
+	Short: "Check if config is out of sync",
+	Long: "Check if there are unpushed local changes or unpulled remote changes.\n\n" +
+		"This is a lightweight check that doesn't modify any files.\n" +
+		"Useful for running in shell prompts or startup scripts.\n\n" +
+		"Exits silently if not initialized.",
+	Run: func(cmd *cobra.Command, args []string) {
+		git := NewGitRunner()
+
+		// Check if git repo exists
+		if _, err := os.Stat(filepath.Join(configFolder().FullPath, ".git")); os.IsNotExist(err) {
+			return // Silent exit if not initialized
+		}
+
+		hasUnpushed, err := git.HasUnpushedChanges()
+		if err != nil {
+			return // Silent on error
+		}
+
+		hasUnpulled, err := git.HasUnpulledChanges()
+		if err != nil {
+			return // Silent on error
+		}
+
+		if !hasUnpushed && !hasUnpulled {
+			return // Silent exit - everything up to date
+		}
+
+		// Build message
+		var msgs []string
+		if hasUnpushed && hasUnpulled {
+			msgs = append(msgs, "Your config is out of sync:")
+			msgs = append(msgs, "  • You have local changes not pushed")
+			msgs = append(msgs, "  • There are remote changes not pulled")
+			msgs = append(msgs, "")
+			msgs = append(msgs, "Run: config-sync pull && config-sync push")
+		} else if hasUnpushed {
+			msgs = append(msgs, "You have local changes not pushed")
+			msgs = append(msgs, "")
+			msgs = append(msgs, "Run: config-sync push")
+		} else if hasUnpulled {
+			msgs = append(msgs, "There are remote changes not pulled")
+			msgs = append(msgs, "")
+			msgs = append(msgs, "Run: config-sync pull")
+		}
+
+		for _, msg := range msgs {
+			log.Println(msg)
+		}
+	},
+}
+
 func init() {
 	setOriginCmd.Flags().Bool("force", false, "Bypass public repository warning")
 	initFromCmd.Flags().Bool("force", false, "Bypass public repository warning")
@@ -203,13 +257,14 @@ Files are stored in ~/.config-sync/synced-files and can be managed with git.
 Version: ` + Version,
 	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip initialization check for init, init-from, help, completion, and version commands
+		// Skip initialization check for init, init-from, check-updates, help, completion, and version commands
 		skipInitCheck := map[string]bool{
-			"init":       true,
-			"init-from":  true,
-			"help":       true,
-			"completion": true,
-			"version":    true,
+			"init":          true,
+			"init-from":     true,
+			"check-updates": true,
+			"help":          true,
+			"completion":    true,
+			"version":       true,
 		}
 		if skipInitCheck[cmd.Name()] {
 			return nil
@@ -228,6 +283,6 @@ Version: ` + Version,
 }
 
 func main() {
-	rootCmd.AddCommand(initCmd, initFromCmd, trackCmd, untrackCmd, pullCmd, pushCmd, setOriginCmd)
+	rootCmd.AddCommand(initCmd, initFromCmd, checkUpdatesCmd, trackCmd, untrackCmd, pullCmd, pushCmd, setOriginCmd)
 	rootCmd.Execute()
 }

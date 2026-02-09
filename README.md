@@ -136,6 +136,21 @@ This restores files from `~/.config-sync/synced-files/` to their original locati
 config-sync untrack ~/.vimrc
 ```
 
+### Check for Updates
+
+```bash
+config-sync check-updates
+```
+
+Lightweight check for sync status. Exits silently if up to date or not initialized. Shows a message if you need to pull or push.
+
+**Example output when out of sync:**
+```
+You have local changes not pushed
+
+Run: config-sync push
+```
+
 ## Example: Syncing Claude Code Config
 
 **First machine:**

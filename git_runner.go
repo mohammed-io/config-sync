@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -48,6 +49,8 @@ type GitRunner interface {
 	AddAndPush(message string) error
 	Init() error
 	Clone(url string) error
+	HasUnpushedChanges() (bool, error)
+	HasUnpulledChanges() (bool, error)
 }
 
 // RealGitRunner executes actual git commands
@@ -186,6 +189,82 @@ func (g RealGitRunner) Clone(url string) error {
 
 	log.Printf("Successfully cloned repository to %s\n", configFolder().TildePath)
 	return nil
+}
+
+// HasUnpushedChanges checks if there are local commits not pushed to remote
+func (g RealGitRunner) HasUnpushedChanges() (bool, error) {
+	// Check if we have an origin remote
+	cmd := exec.Command("git", "remote", "show", "origin")
+	cmd.Dir = g.dir
+	if err := cmd.Run(); err != nil {
+		// No origin or origin not configured
+		return false, nil
+	}
+
+	// Check for unpushed commits by comparing HEAD to origin/main
+	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	cmd.Dir = g.dir
+	output, err := cmd.Output()
+	if err != nil {
+		// Upstream branch not set yet
+		return false, nil
+	}
+
+	// Output format: "behind\tahead" or just counts
+	parts := strings.Fields(string(output))
+	if len(parts) >= 2 {
+		// Second number is commits ahead (unpushed)
+		return parts[1] != "0", nil
+	}
+
+	// Check for uncommitted changes as well
+	cmd = exec.Command("git", "status", "--porcelain")
+	cmd.Dir = g.dir
+	output, err = cmd.Output()
+	if err != nil {
+		return false, err
+	}
+
+	return len(strings.TrimSpace(string(output))) > 0, nil
+}
+
+// HasUnpulledChanges checks if there are remote commits not pulled locally
+func (g RealGitRunner) HasUnpulledChanges() (bool, error) {
+	// Check if we have an origin remote
+	cmd := exec.Command("git", "remote", "show", "origin")
+	cmd.Dir = g.dir
+	if err := cmd.Run(); err != nil {
+		// No origin or origin not configured
+		return false, nil
+	}
+
+	// Check for unpulled commits by comparing HEAD to origin/main
+	// First fetch to get updated remote info
+	cmd = exec.Command("git", "fetch", "origin", "--dry-run")
+	cmd.Dir = g.dir
+	// Suppress output
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	_ = cmd.Run() // Ignore errors, might not be reachable
+
+	// Check commits we're behind
+	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	cmd.Dir = g.dir
+	output, err := cmd.Output()
+	if err != nil {
+		// Upstream branch not set yet
+		return false, nil
+	}
+
+	// Output format: "behind\tahead"
+	parts := strings.Fields(string(output))
+	if len(parts) >= 1 {
+		// First number is commits behind (unpulled)
+		return parts[0] != "0", nil
+	}
+
+	return false, nil
 }
 
 // NewGitRunner creates a new GitRunner for the config folder
