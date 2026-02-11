@@ -196,7 +196,8 @@ var checkUpdatesCmd = &cobra.Command{
 	Long: "Check if there are unpushed local changes or unpulled remote changes.\n\n" +
 		"This is a lightweight check that doesn't modify any files.\n" +
 		"Useful for running in shell prompts or startup scripts.\n\n" +
-		"Exits silently if not initialized.",
+		"Exits silently if not initialized.\n\n" +
+		"Operations are timed and logged with millisecond precision.",
 	Run: func(cmd *cobra.Command, args []string) {
 		git := NewGitRunner()
 
@@ -208,17 +209,17 @@ var checkUpdatesCmd = &cobra.Command{
 		// Load config to check for unsynced source files
 		_ = appConfig.Initialize(configFolder())
 
-		hasUnsynced, _ := appConfig.HasUnsyncedChanges()
+		// Create timing logger (always enabled)
+		logger := NewTimingLogger("[check-updates] ", true)
 
-		hasUnpushed, err := git.HasUnpushedChanges()
-		if err != nil {
-			return // Silent on error
-		}
+		// Create check strategy with all optimizations
+		syncDir := filepath.Join(configFolder().FullPath, "synced-files")
+		checker := NewCheckStrategy(git, &appConfig, syncDir, logger)
 
-		hasUnpulled, err := git.HasUnpulledChanges()
-		if err != nil {
-			return // Silent on error
-		}
+		// Run checks
+		hasUnsynced, _ := checker.CheckUnsyncedFiles()
+		hasUnpushed, _ := checker.CheckUnpushed()
+		hasUnpulled, _ := checker.CheckUnpulled()
 
 		if !hasUnsynced && !hasUnpushed && !hasUnpulled {
 			return // Silent exit - everything up to date
@@ -250,6 +251,7 @@ var checkUpdatesCmd = &cobra.Command{
 func init() {
 	setOriginCmd.Flags().Bool("force", false, "Bypass public repository warning")
 	initFromCmd.Flags().Bool("force", false, "Bypass public repository warning")
+	checkUpdatesCmd.Flags().StringP("strategy", "s", "manual", "Check strategy: manual or copy-then-diff")
 }
 
 var rootCmd = &cobra.Command{

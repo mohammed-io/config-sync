@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -330,7 +331,7 @@ func (c *JsonConfig) RestoreFiles() error {
 }
 
 // HasUnsyncedChanges checks if any tracked source files have changed since last sync
-// Compares mtime+size of source files against synced-files/ versions
+// Compares content hash of source files against synced-files/ versions
 // Non-destructive: doesn't modify any files
 func (c *JsonConfig) HasUnsyncedChanges() (bool, error) {
 	if err := c.checkInitialized(); err != nil {
@@ -345,27 +346,42 @@ func (c *JsonConfig) HasUnsyncedChanges() (bool, error) {
 		baseName := filepath.Base(srcPath.FullPath)
 		syncedPath := filepath.Join(syncDir.FullPath, hash, baseName)
 
-		// Get source file info
-		srcInfo, err := os.Stat(srcPath.FullPath)
+		// Get source file hash
+		srcHash, err := fileHash(srcPath.FullPath)
 		if err != nil {
-			// Source file doesn't exist - consider it unchanged
+			// Source file doesn't exist or unreadable - consider it unchanged
 			// (user may have deleted it, we'll handle that on push)
 			continue
 		}
 
-		// Get synced file info
-		syncedInfo, err := os.Stat(syncedPath)
+		// Get synced file hash
+		syncedHash, err := fileHash(syncedPath)
 		if err != nil {
 			// Synced file doesn't exist - file is new/changed
 			return true, nil
 		}
 
-		// Compare mtime and size
-		// Source has changed if its mtime is newer than synced (modified after sync)
-		if srcInfo.ModTime().After(syncedInfo.ModTime()) || srcInfo.Size() != syncedInfo.Size() {
+		// Compare hashes
+		if srcHash != syncedHash {
 			return true, nil
 		}
 	}
 
 	return false, nil
+}
+
+// fileHash returns the SHA256 hash of a file's contents
+func fileHash(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

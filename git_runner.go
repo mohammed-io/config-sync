@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // isMergeConflict checks if there are merge conflict markers in the directory
@@ -193,28 +194,42 @@ func (g RealGitRunner) Clone(url string) error {
 
 // HasUnpushedChanges checks if there are local commits not pushed to remote
 func (g RealGitRunner) HasUnpushedChanges() (bool, error) {
-	// Check if we have an origin remote
-	cmd := exec.Command("git", "remote", "show", "origin")
-	cmd.Dir = g.dir
-	if err := cmd.Run(); err != nil {
-		// No origin or origin not configured
-		return false, nil
-	}
+	// Local git operations timeout
+	const timeout = 2 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	// Check for unpushed commits by comparing HEAD to origin/main
-	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	cmd := exec.CommandContext(ctx, "git", "rev-list", "--left-right", "--count", "HEAD...@{u}")
 	cmd.Dir = g.dir
 	output, err := cmd.Output()
+	if err != nil && ctx.Err() == context.DeadlineExceeded {
+		// Timeout, check for uncommitted changes only
+		cmd = exec.Command("git", "status", "--porcelain")
+		cmd.Dir = g.dir
+		output, err = cmd.Output()
+		if err != nil {
+			return false, err
+		}
+		return len(strings.TrimSpace(string(output))) > 0, nil
+	}
 	if err != nil {
-		// Upstream branch not set yet
-		return false, nil
+		// Upstream branch not set yet, check for uncommitted changes only
+		cmd = exec.Command("git", "status", "--porcelain")
+		cmd.Dir = g.dir
+		output, err = cmd.Output()
+		if err != nil {
+			return false, err
+		}
+		return len(strings.TrimSpace(string(output))) > 0, nil
 	}
 
 	// Output format: "behind\tahead" or just counts
 	parts := strings.Fields(string(output))
-	if len(parts) >= 2 {
+	if len(parts) >= 2 && parts[1] != "0" {
 		// Second number is commits ahead (unpushed)
-		return parts[1] != "0", nil
+		return true, nil
 	}
 
 	// Check for uncommitted changes as well
@@ -230,41 +245,48 @@ func (g RealGitRunner) HasUnpushedChanges() (bool, error) {
 
 // HasUnpulledChanges checks if there are remote commits not pulled locally
 func (g RealGitRunner) HasUnpulledChanges() (bool, error) {
-	// Check if we have an origin remote
-	cmd := exec.Command("git", "remote", "show", "origin")
-	cmd.Dir = g.dir
-	if err := cmd.Run(); err != nil {
-		// No origin or origin not configured
-		return false, nil
-	}
+	// Git remote operations timeout (5s for ls-remote)
+	const remoteTimeout = 5 * time.Second
+	const localTimeout = 2 * time.Second
 
-	// Check for unpulled commits by comparing HEAD to origin/main
-	// First fetch to get updated remote info
-	cmd = exec.Command("git", "fetch", "origin", "--dry-run")
-	cmd.Dir = g.dir
-	// Suppress output
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	_ = cmd.Run() // Ignore errors, might not be reachable
+	// Get local HEAD
+	ctxLocal, cancelLocal := context.WithTimeout(context.Background(), localTimeout)
+	defer cancelLocal()
 
-	// Check commits we're behind
-	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	cmd := exec.CommandContext(ctxLocal, "git", "rev-parse", "HEAD")
 	cmd.Dir = g.dir
-	output, err := cmd.Output()
+	localHead, err := cmd.Output()
 	if err != nil {
-		// Upstream branch not set yet
+		// No commits yet
+		return false, nil
+	}
+	localHash := strings.TrimSpace(string(localHead))
+
+	// Get remote HEAD using ls-remote (5s timeout)
+	ctxRemote, cancelRemote := context.WithTimeout(context.Background(), remoteTimeout)
+	defer cancelRemote()
+
+	cmd = exec.CommandContext(ctxRemote, "git", "ls-remote", "--heads", "origin", "main")
+	cmd.Dir = g.dir
+	remoteHead, err := cmd.Output()
+	if err != nil {
+		if ctxRemote.Err() == context.DeadlineExceeded {
+			// Timeout - assume no remote access
+			return false, nil
+		}
+		// Remote not reachable or not configured
 		return false, nil
 	}
 
-	// Output format: "behind\tahead"
-	parts := strings.Fields(string(output))
-	if len(parts) >= 1 {
-		// First number is commits behind (unpulled)
-		return parts[0] != "0", nil
+	// ls-remote output format: "<hash>\trefs/heads/main"
+	parts := strings.Split(string(remoteHead), "\t")
+	if len(parts) < 2 {
+		return false, nil
 	}
+	remoteHash := parts[0]
 
-	return false, nil
+	// If hashes differ, there are unpulled changes
+	return localHash != remoteHash, nil
 }
 
 // NewGitRunner creates a new GitRunner for the config folder
