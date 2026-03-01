@@ -1,3 +1,16 @@
+## [v0.0.16] - 2026-03-01
+
+[Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.15...v0.0.16)
+
+<details>
+<summary>Other</summary>
+
+- Faster check for git remote branches ([0f9dba9](https://github.com/mohammed-io/config-sync/commit/0f9dba9561a23e2c0e41b1a7f839d268ca4238f6))
+- With timeout and less network wait ([e4a5485](https://github.com/mohammed-io/config-sync/commit/e4a5485ca1c2503d1cde599175ff11cca6197559))
+
+</details>
+
+
 ## [v0.0.15] - 2026-02-09
 
 [Full Changelog](https://github.com/mohammed-io/config-sync/compare/v0.0.14...v0.0.15)
