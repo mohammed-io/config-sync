@@ -31,7 +31,7 @@ func DefaultTimeouts() TimeoutConfig {
 
 // TimingLogger logs operation durations and timeouts
 type TimingLogger struct {
-	prefix string
+	prefix  string
 	enabled bool
 	writer  io.Writer
 }
@@ -86,8 +86,8 @@ type CheckStrategy struct {
 	git      GitRunner
 	config   *JsonConfig
 	syncDir  string
-	logger    *TimingLogger
-	timeouts  TimeoutConfig
+	logger   *TimingLogger
+	timeouts TimeoutConfig
 }
 
 // NewCheckStrategy creates a new check strategy with all optimizations
@@ -96,8 +96,8 @@ func NewCheckStrategy(git GitRunner, config *JsonConfig, syncDir string, logger 
 		git:      git,
 		config:   config,
 		syncDir:  syncDir,
-		logger:    logger,
-		timeouts:  DefaultTimeouts(),
+		logger:   logger,
+		timeouts: DefaultTimeouts(),
 	}
 }
 
